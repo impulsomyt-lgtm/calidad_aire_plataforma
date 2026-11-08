@@ -1,0 +1,19 @@
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencias, compilaciones y registros
+node_modules/
+dist/
+build/
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Exportaciones locales de datos
+*.csv

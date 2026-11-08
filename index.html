@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Panel en tiempo real de la estación IoT de calidad del aire de Bucaramanga.">
+  <title>AIRE BGA | Plataforma de calidad del aire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#panel" aria-label="Ir al panel general">
+        <span class="brand-icon">✳</span>
+        <span class="brand-name">AIRE<span class="brand-point">.</span><small>BUCARAMANGA</small></span>
+      </a>
+      <div class="sidebar-section">
+        <p class="menu-caption">PLATAFORMA</p>
+        <nav class="nav" aria-label="Secciones de la plataforma">
+          <a class="nav-item active" data-view="panel" href="#panel" aria-current="page"><span class="nav-icon">▦</span><span>Panel general</span><span class="nav-chevron">›</span></a>
+          <a class="nav-item" data-view="tendencias" href="#tendencias"><span class="nav-icon">⌁</span><span>Tendencias</span><span class="nav-chevron">›</span></a>
+          <a class="nav-item" data-view="sensores" href="#sensores"><span class="nav-icon">◈</span><span>Sensores</span><span class="nav-chevron">›</span></a>
+          <a class="nav-item" data-view="alertas" href="#alertas"><span class="nav-icon">♧</span><span>Alertas</span><span class="nav-unread-dot" id="navAlertCount" hidden aria-hidden="true" title="Nueva alerta sin revisar"></span><span class="nav-chevron">›</span></a>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div class="station-sidebar"><span class="station-bullet"></span><div><strong>Estación 01</strong><span>ESP32 · Sensirion SEN55</span></div></div>
+        <p>Prototipo académico<br>Monitoreo ambiental exterior</p>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-left"><span class="topbar-label">AIRE BGA</span><span class="slash">/</span><strong id="breadcrumb">Panel general</strong></div>
+        <div class="topbar-right"><span class="time-label"><span class="clock-dot"></span><span id="clock">--:--:--</span></span><span class="topbar-zone">COL · UTC−5</span></div>
+      </header>
+
+      <main class="content">
+        <!-- PANTALLA 1: PANEL GENERAL -->
+        <section class="view active" data-page="panel" aria-labelledby="panelTitulo">
+          <div class="page-intro intro-row">
+            <div><div class="eyebrow">ESTACIÓN AMBIENTAL · BUCARAMANGA</div><h1 id="panelTitulo">Tu ciudad, en datos<span class="title-dot">.</span></h1><p>Una mirada clara a la calidad del aire, directamente desde el sensor SEN55.</p></div>
+            <div class="connection-pill" id="connectionBadge" role="status" aria-live="polite"><span class="connection-dot"></span><span id="connectionText">Conectando al broker…</span></div>
+          </div>
+
+          <div class="air-overview-grid">
+            <article class="air-status-card" id="operationalCard" data-level="pending" aria-live="polite">
+              <div class="card-overline"><span class="eyebrow">ESTADO ACTUAL POR PARTÍCULAS</span><span class="status-window">MONITOREO PREVENTIVO</span></div>
+              <div class="air-status-center">
+                <div class="status-orb"><span class="status-orb-symbol" id="statusSymbol">◉</span></div>
+                <div class="air-status-description">
+                  <span class="status-kicker" id="operationalKicker">ESPERANDO DATOS</span>
+                  <h2 id="operationalState">Estado por determinar</h2>
+                  <p id="operationalExplanation">Al recibir 4 mediciones consecutivas (aprox. 2 minutos) confirmaremos el nivel del semáforo.</p>
+                </div>
+                <div class="traffic-lights" id="trafficLights" role="img" aria-label="Semáforo sin evaluar"><span class="traffic-light traffic-green"></span><span class="traffic-light traffic-yellow"></span><span class="traffic-light traffic-orange"></span><span class="traffic-light traffic-red"></span></div>
+              </div>
+              <div class="status-progress-row"><span><span class="pulse-dot"></span> Última captura: <strong id="lastCapture">Esperando datos</strong></span></div>
+              <p class="status-disclaimer">Clasificación operativa experimental basada solo en PM2.5 y PM10. No equivale al Índice de Calidad del Aire oficial.</p>
+            </article>
+            <article class="ica-widget secondary-widget">
+              <div class="card-overline"><span class="eyebrow">VARIABLES COMPLEMENTARIAS</span><span class="info-circle" title="Índices relativos, no concentraciones de gases">i</span></div>
+              <h3>Señales de gases</h3>
+              <p class="secondary-note">Indicadores relativos del SEN55; se muestran por separado del estado principal del aire.</p>
+              <div class="secondary-measures"><div><span>VOC Index</span><strong data-field="voc_index">—</strong><small id="vocStatus">Sin lectura</small></div><div><span>NOx Index</span><strong data-field="nox_index">—</strong><small id="noxStatus">Sin lectura</small></div></div>
+              <div class="secondary-footer"><span class="pulse-dot"></span><span id="secondaryEvents">Avisos relativos: sin datos</span></div>
+              <a href="#alertas" class="text-link">Ver reglas y avisos <span>→</span></a>
+            </article>
+          </div>
+
+          <div class="section-heading"><div><span class="section-eyebrow">INDICADORES PRINCIPALES</span><h2>Material particulado</h2></div><span class="section-caption">Lecturas instantáneas · µg/m³</span></div>
+          <div class="main-metrics">
+            <article class="big-metric card-green"><div class="big-metric-top"><span class="metric-symbol">PM</span><span class="big-metric-type">PARTÍCULAS FINAS</span></div><div class="big-metric-info"><div><span class="big-metric-name">PM2.5</span><div class="big-metric-value"><strong data-field="pm25">--</strong><span>µg/m³</span></div></div><span class="big-metric-arrow">↗</span></div><div class="big-metric-bottom"><span class="mini-circle"></span><span>Lectura instantánea · <b class="pm-indicator" id="pm25StatusChip">Alerta pendiente</b></span></div></article>
+            <article class="big-metric card-blue"><div class="big-metric-top"><span class="metric-symbol">PM</span><span class="big-metric-type">PARTÍCULAS INHALABLES</span></div><div class="big-metric-info"><div><span class="big-metric-name">PM10</span><div class="big-metric-value"><strong data-field="pm10">--</strong><span>µg/m³</span></div></div><span class="big-metric-arrow">↗</span></div><div class="big-metric-bottom"><span class="mini-circle"></span><span>Lectura instantánea · <b class="pm-indicator" id="pm10StatusChip">Alerta pendiente</b></span></div></article>
+          </div>
+
+          <div class="overview-bottom">
+            <article class="white-card quick-card"><div class="card-title-row"><h3>Condiciones ambientales</h3><span class="card-icon-soft">☀</span></div><div class="quick-readings"><div><span>Temperatura</span><strong><span data-field="temperatura">--</span> <small>°C</small></strong></div><div><span>Humedad relativa</span><strong><span data-field="humedad">--</span> <small>%</small></strong></div></div></article>
+            <article class="white-card quick-card"><div class="card-title-row"><h3>Actividad de la estación</h3><span class="card-icon-soft blue-icon">⌁</span></div><div class="quick-readings"><div><span>Última recepción</span><strong id="lastReceived">Sin datos</strong></div><div><span>Mensajes de esta sesión</span><strong id="messageCount">0</strong></div></div></article>
+            <article class="white-card info-card"><div class="card-title-row"><h3>Lectura responsable</h3><span class="card-icon-soft amber-icon">i</span></div><p>Este prototipo monitorea partículas en el aire exterior. Sus lecturas no sustituyen una estación oficial ni equivalen por sí solas a una evaluación normativa.</p><a href="#tendencias" class="text-link">Explorar tendencias <span>→</span></a></article>
+          </div>
+          <article class="white-card home-alerts-card">
+            <div><span class="section-eyebrow">MONITOREO PREVENTIVO</span><h3>Alertas de la estación</h3><p id="homeAlertsDescription">Las alertas aparecerán al detectarse incrementos sostenidos de partículas.</p></div>
+            <div class="home-alerts-right"><span class="home-alert-count" id="homeAlertsCount">0 eventos</span><a class="view-alerts-link" href="#alertas">Abrir alertas <span>→</span></a></div>
+          </article>
+        </section>
+
+        <!-- PANTALLA 2: TENDENCIAS Y GRÁFICAS UNIFICADAS -->
+        <section class="view" data-page="tendencias" aria-labelledby="tendenciasTitulo" hidden>
+          <div class="page-intro intro-row">
+            <div><div class="eyebrow">ANÁLISIS HISTÓRICO · ESTACIÓN 01</div><h1 id="tendenciasTitulo">Tendencias <span class="title-dot">ambientales.</span></h1><p>Filtra tus mediciones por fecha, elige las gráficas que quieras y revisa las últimas 12 lecturas.</p></div>
+            <span class="live-chart-tag">● Actualización automática</span>
+          </div>
+          <div class="trend-summary">
+            <article class="stat-card"><span>Lecturas del período</span><strong id="sessionCount">0</strong><small>Según el filtro seleccionado</small></article>
+            <article class="stat-card"><span>Promedio PM2.5</span><strong><span id="averagePm25">—</span> <small>µg/m³</small></strong><small>Promedio descriptivo de la selección</small></article>
+            <article class="stat-card"><span>Promedio PM10</span><strong><span id="averagePm10">—</span> <small>µg/m³</small></strong><small>Promedio descriptivo de la selección</small></article>
+          </div>
+          <article class="white-card custom-time-card">
+            <div class="custom-time-heading"><div><span class="section-eyebrow">FILTROS DE TIEMPO</span><h2>Selecciona las fechas</h2></div><span class="custom-filter-hint">Hora Colombia · UTC−5</span></div>
+            <div class="filter-panel custom-filter-panel">
+              <div class="filter-field"><label for="graphRange">Mostrar datos de</label><select id="graphRange"><option value="40">Últimas 40 lecturas</option><option value="1h">Última hora</option><option value="6h" selected>Últimas 6 horas</option><option value="24h">Últimas 24 horas</option><option value="7d">Últimos 7 días</option><option value="30d">Últimos 30 días</option><option value="all">Todo el historial</option><option value="custom">Rango personalizado</option></select></div>
+              <div class="filter-field"><label for="graphFrom">Desde</label><input type="datetime-local" id="graphFrom" disabled></div>
+              <div class="filter-field"><label for="graphTo">Hasta</label><input type="datetime-local" id="graphTo" disabled></div>
+              <button type="button" class="filter-apply" id="graphApply" disabled>Aplicar fechas</button>
+            </div>
+            <div class="custom-filter-footer"><p id="graphFilterInfo" role="status" aria-live="polite">Las gráficas reflejan el historial guardado en este navegador.</p></div>
+          </article>
+          <article class="white-card custom-chooser">
+            <div class="custom-chooser-head">
+              <div><span class="section-eyebrow">SELECCIÓN DE VARIABLES</span><h2>¿Qué quieres visualizar?</h2><p>Marca o desmarca las casillas. Puedes mostrar una, varias o las ocho variables.</p></div>
+              <div class="selector-actions"><span class="selected-count" id="selectedCount">2 de 8 seleccionadas</span><button id="selectAllGraphs" class="select-action" type="button">Seleccionar todas</button><button id="clearGraphs" class="select-action select-clear" type="button">Quitar todas</button></div>
+            </div>
+            <div class="check-grid" id="graphChoices" role="group" aria-label="Seleccionar variables para graficar">
+              <label class="check-tile"><input type="checkbox" data-graph="pm1"><span class="check-dot" style="--check-color:#399bba"></span><span>PM1.0 <small>µg/m³</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="pm25" checked><span class="check-dot" style="--check-color:#14a681"></span><span>PM2.5 <small>µg/m³</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="pm4"><span class="check-dot" style="--check-color:#6a8dd9"></span><span>PM4.0 <small>µg/m³</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="pm10" checked><span class="check-dot" style="--check-color:#3984db"></span><span>PM10 <small>µg/m³</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="temperatura"><span class="check-dot" style="--check-color:#df8c3a"></span><span>Temperatura <small>°C</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="humedad"><span class="check-dot" style="--check-color:#16a6b7"></span><span>Humedad <small>%</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="voc_index"><span class="check-dot" style="--check-color:#9b70dd"></span><span>VOC Index <small>Índice relativo</small></span></label>
+              <label class="check-tile"><input type="checkbox" data-graph="nox_index"><span class="check-dot" style="--check-color:#b565ba"></span><span>NOx Index <small>Índice relativo</small></span></label>
+            </div>
+          </article>
+          <div class="custom-chart-heading"><div><span class="section-eyebrow">PANELES INDIVIDUALES</span><h2>Gráficas seleccionadas</h2></div><span id="graphPanelCount">2 gráficas</span></div>
+          <div class="custom-charts-grid" id="customCharts" aria-live="polite"></div>
+          <div class="custom-no-selection" id="customNoSelection" hidden><div>▥</div><h3>Selecciona una variable para comenzar</h3><p>Las gráficas aparecerán aquí, una por indicador, en dos columnas.</p></div>
+          <p class="graph-disclaimer">Cada gráfica tiene su propia escala y unidad; los VOC y NOx son índices relativos, no concentraciones de gases. Se muestran hasta 350 puntos por gráfica, pero el CSV incluye todos los registros filtrados. Sin Supabase, solo hay datos de períodos en los que la página estuvo abierta en este navegador.</p>
+          <article class="white-card readings-panel unified-readings">
+            <div class="chart-head">
+              <div><span class="section-eyebrow">REGISTRO DE MEDICIONES</span><h2>Últimas 12 mediciones</h2><p>Las 12 más recientes dentro del período seleccionado; los archivos CSV incluyen el historial completo o filtrado.</p></div>
+              <div class="export-actions"><button class="export-btn export-outline" id="exportAllBtn" type="button" disabled>↓ CSV completo</button><button class="export-btn" id="exportBtn" type="button" disabled>↓ CSV del período</button></div>
+            </div>
+            <div class="table-scroll"><table class="readings-table"><thead><tr><th>Fecha y hora</th><th>PM1.0</th><th>PM2.5</th><th>PM4.0</th><th>PM10</th><th>Temperatura</th><th>Humedad</th><th>VOC Index</th><th>NOx Index</th></tr></thead><tbody id="recentRows"><tr><td colspan="9" class="empty-row">Sin mediciones para este período</td></tr></tbody></table></div>
+            <p class="table-footnote">Historial en IndexedDB de este navegador: se conservan las lecturas recibidas mientras esta web estuvo abierta. No se descargan mediciones de otros navegadores ni de momentos en que la web estuvo cerrada. Próximamente conectaremos Supabase.</p>
+          </article>
+        </section>
+
+        <!-- PANTALLA 3: SENSORES -->
+        <section class="view" data-page="sensores" aria-labelledby="sensoresTitulo" hidden>
+          <div class="page-intro"><div class="eyebrow">TELEMETRÍA DE LA ESTACIÓN</div><h1 id="sensoresTitulo">Sensores <span class="title-dot">y variables.</span></h1><p>Detalle de todas las mediciones entregadas por tu Sensirion SEN55.</p></div>
+          <div class="sensor-info-line"><span class="sensor-status-dot"></span><strong>Sensirion SEN55</strong><span>·</span><span>ESP32 · GPIO25 (SDA), GPIO26 (SCL)</span><span class="sensor-spacing"></span><span>Actualización esperada cada 30 s</span></div>
+          <div class="section-heading"><div><span class="section-eyebrow">MATERIAL PARTICULADO</span><h2>Concentraciones</h2></div><span class="section-caption">µg/m³</span></div>
+          <div class="sensor-metrics">
+            <article class="sensor-card"><span class="sensor-graphic green-graphic">◌</span><p>PM1.0</p><div><strong data-field="pm1">--</strong><small>µg/m³</small></div><span>Partículas de hasta 1 µm</span></article>
+            <article class="sensor-card"><span class="sensor-graphic green-graphic">◌</span><p>PM2.5</p><div><strong data-field="pm25">--</strong><small>µg/m³</small></div><span>Partículas finas</span></article>
+            <article class="sensor-card"><span class="sensor-graphic blue-graphic">◌</span><p>PM4.0</p><div><strong data-field="pm4">--</strong><small>µg/m³</small></div><span>Partículas de hasta 4 µm</span></article>
+            <article class="sensor-card"><span class="sensor-graphic blue-graphic">◌</span><p>PM10</p><div><strong data-field="pm10">--</strong><small>µg/m³</small></div><span>Partículas inhalables</span></article>
+          </div>
+          <div class="section-heading sensors-heading"><div><span class="section-eyebrow">VARIABLES COMPLEMENTARIAS</span><h2>Condiciones e índices</h2></div></div>
+          <div class="sensor-metrics">
+            <article class="sensor-card"><span class="sensor-graphic amber-graphic">☀</span><p>Temperatura</p><div><strong data-field="temperatura">--</strong><small>°C</small></div><span>Temperatura del aire</span></article>
+            <article class="sensor-card"><span class="sensor-graphic blue-graphic">◍</span><p>Humedad</p><div><strong data-field="humedad">--</strong><small>%</small></div><span>Humedad relativa</span></article>
+            <article class="sensor-card"><span class="sensor-graphic lilac-graphic">≈</span><p>VOC Index</p><div><strong data-field="voc_index">--</strong><small>índice</small></div><span>Respuesta relativa a COV</span></article>
+            <article class="sensor-card"><span class="sensor-graphic lilac-graphic">≈</span><p>NOx Index</p><div><strong data-field="nox_index">--</strong><small>índice</small></div><span>Respuesta relativa a gases oxidantes</span></article>
+          </div>
+          <div class="sensors-bottom"><article class="white-card detail-card"><h3>Información de la conexión</h3><div class="detail-line"><span>Broker</span><strong>broker.hivemq.com</strong></div><div class="detail-line"><span>Tópico</span><strong class="topic-text">bga/aire/sen55/estacion01/datos</strong></div><div class="detail-line"><span>Estado de última lectura</span><strong id="freshness">Pendiente</strong></div><div class="detail-line"><span>Hora de captura</span><strong id="sensorCapture">Sin datos</strong></div></article><article class="white-card advisory-card"><div class="advisory-icon">i</div><h3>Acerca de VOC y NOx</h3><p>VOC Index y NOx Index son señales relativas del SEN55. No representan concentraciones en ppm o µg/m³ ni permiten identificar gases específicos.</p><p>Para evaluar calidad del aire exterior, los indicadores principales de esta estación son PM2.5 y PM10.</p></article></div>
+        </section>
+        <!-- PANTALLA 4: ALERTAS -->
+        <section class="view" data-page="alertas" aria-labelledby="alertasTitulo" hidden>
+          <div class="page-intro intro-row"><div><div class="eyebrow">MONITOREO PREVENTIVO</div><h1 id="alertasTitulo">Centro de <span class="title-dot">alertas.</span></h1><p>Eventos confirmados por persistencia de cuatro mediciones consecutivas, aproximadamente dos minutos.</p></div><div class="alerts-live-label"><span class="pulse-dot"></span> Evaluación cada 30 segundos</div></div>
+          <div class="alert-stats-row">
+            <article class="alert-stat alert-stat-primary" id="alertStatusCard" data-level="pending"><span>Estado por partículas</span><strong id="alertsCurrentStatus">Sin evaluar</strong><small id="alertsCurrentDetail">Esperando cuatro lecturas consecutivas</small><div class="alert-stat-deco">◎</div></article>
+            <article class="alert-stat"><span>Eventos registrados</span><strong id="alertsTotal">0</strong><small>Guardados en este navegador</small></article>
+            <article class="alert-stat"><span>Avisos complementarios</span><strong id="alertsActive">0</strong><small>VOC y NOx · índices relativos</small></article>
+          </div>
+          <article class="white-card thresholds-panel">
+            <div class="thresholds-header"><div><span class="section-eyebrow">REGLAS DE EVALUACIÓN</span><h2>Semáforo de material particulado</h2><p>Una alerta se confirma si cualquiera de los contaminantes mantiene el nivel durante 4 lecturas consecutivas. Para mejorar o normalizar también se exigen 4 lecturas.</p></div><span class="prototype-tag">NO ES ICA OFICIAL</span></div>
+            <div class="threshold-grid four-levels">
+              <div class="threshold-tile level-normal"><div class="threshold-label"><span class="threshold-dot"></span> Verde · Normal</div><div class="threshold-values"><span><b>PM2.5</b> &lt; 13 µg/m³</span><span><b>PM10</b> &lt; 55 µg/m³</span></div><small>Concentraciones bajas según la regla experimental</small></div>
+              <div class="threshold-tile level-attention"><div class="threshold-label"><span class="threshold-dot"></span> Amarillo · Atención</div><div class="threshold-values"><span><b>PM2.5</b> 13 a &lt;38</span><span><b>PM10</b> 55 a &lt;155</span></div><small>Incremento persistente; revisar tendencia</small></div>
+              <div class="threshold-tile level-elevated"><div class="threshold-label"><span class="threshold-dot"></span> Naranja · Elevada</div><div class="threshold-values"><span><b>PM2.5</b> 38 a &lt;56</span><span><b>PM10</b> 155 a &lt;255</span></div><small>Evento relevante; requiere seguimiento</small></div>
+              <div class="threshold-tile level-high"><div class="threshold-label"><span class="threshold-dot"></span> Rojo · Muy elevada</div><div class="threshold-values"><span><b>PM2.5</b> ≥56</span><span><b>PM10</b> ≥255</span></div><small>Alerta operativa prioritaria del prototipo</small></div>
+            </div>
+            <p class="threshold-footer">Estos puntos de corte se inspiran en las bandas del ICA colombiano de 24 h, pero aquí se aplican como <strong>reglas experimentales de corto plazo</strong>. No constituyen niveles oficiales de peligro ni recomendaciones de exposición de 2 minutos.</p>
+          </article>
+          <article class="white-card secondary-alerts-panel"><div><span class="section-eyebrow">SENSORES DE GASES · ORIENTATIVOS</span><h2>Eventos relativos de VOC y NOx</h2><p>También registramos 4 lecturas consecutivas con VOC Index ≥150 o NOx Index ≥20. Estas cifras son criterios operativos, no umbrales sanitarios.</p></div><div class="secondary-rules"><div><strong>VOC</strong><span>≥ 150 durante 4 lecturas</span><small id="vocRuleState">Sin evaluación</small></div><div><strong>NOx</strong><span>≥ 20 durante 4 lecturas</span><small id="noxRuleState">Sin evaluación</small></div></div></article>
+          <article class="white-card alerts-log-panel">
+            <div class="alerts-log-heading"><div><span class="section-eyebrow">TRAZABILIDAD DE EVENTOS</span><h2>Historial de alertas</h2><p>Activaciones, cambios de nivel y recuperaciones con fecha y hora de captura.</p></div><div class="alert-table-actions"><label class="sr-only" for="alertFilter">Filtrar alertas</label><select id="alertFilter"><option value="todos">Todos los eventos</option><option value="pm">Solo partículas</option><option value="voc">Solo VOC</option><option value="nox">Solo NOx</option></select><button class="export-btn" id="exportAlertsBtn" type="button" disabled>↓ Exportar alertas</button></div></div>
+            <div class="table-scroll"><table class="alerts-table"><thead><tr><th>Fecha y hora</th><th>Indicador</th><th>Evento</th><th>Valor</th><th>Estado</th></tr></thead><tbody id="alertRows"><tr><td colspan="5" class="empty-row">Sin eventos confirmados todavía.</td></tr></tbody></table></div><p class="table-footnote">Los eventos quedan guardados localmente en este navegador. Sin Supabase todavía no existe un historial centralizado ni alertas cuando la página está cerrada.</p>
+          </article>
+          <article class="white-card ica-legend-panel"><div><span class="section-eyebrow">CONTEXTO NORMATIVO</span><h2>Índice de Calidad del Aire (ICA) colombiano</h2><p>La escala oficial tiene seis categorías y se determina con promedios de concentración de 24 horas para PM2.5 y PM10. Nuestra alerta inmediata <strong>no</strong> es ese índice.</p></div><div class="ica-legend-grid">
+            <div><i style="--legend-color:#26a86a"></i><b>0–50</b><span>Buena</span></div><div><i style="--legend-color:#eac53d"></i><b>51–100</b><span>Aceptable</span></div><div><i style="--legend-color:#f2a34a"></i><b>101–150</b><span>Grupos sensibles</span></div><div><i style="--legend-color:#e65458"></i><b>151–200</b><span>Dañina</span></div><div><i style="--legend-color:#9562c7"></i><b>201–300</b><span>Muy dañina</span></div><div><i style="--legend-color:#85524c"></i><b>301–500</b><span>Peligrosa</span></div>
+          </div><p class="ica-legal-note">Referencia: <a href="https://www.minambiente.gov.co/wp-content/uploads/2021/10/Resolucion-2254-de-2017.pdf" target="_blank" rel="noopener noreferrer">Resolución 2254 de 2017</a>. La aplicación no afirma cumplir la metodología oficial del ICA ni reemplaza estaciones de referencia.</p></article>
+        </section>
+
+        <footer class="app-footer"><span>AIRE.BGA · Proyecto académico de Ingeniería de Software</span><span>Historial local en este navegador · Sin certificación regulatoria</span></footer>
+      </main>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mqtt@5.15.1/dist/mqtt.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
