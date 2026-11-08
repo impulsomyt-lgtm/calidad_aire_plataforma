@@ -108,7 +108,7 @@
               <div class="filter-field"><label for="graphTo">Hasta</label><input type="datetime-local" id="graphTo" disabled></div>
               <button type="button" class="filter-apply" id="graphApply" disabled>Aplicar fechas</button>
             </div>
-            <div class="custom-filter-footer"><p id="graphFilterInfo" role="status" aria-live="polite">Las gráficas reflejan el historial guardado en este navegador.</p></div>
+            <div class="custom-filter-footer"><p id="graphFilterInfo" role="status" aria-live="polite">Consultando historial en Supabase…</p></div>
           </article>
           <article class="white-card custom-chooser">
             <div class="custom-chooser-head">
@@ -129,14 +129,14 @@
           <div class="custom-chart-heading"><div><span class="section-eyebrow">PANELES INDIVIDUALES</span><h2>Gráficas seleccionadas</h2></div><span id="graphPanelCount">2 gráficas</span></div>
           <div class="custom-charts-grid" id="customCharts" aria-live="polite"></div>
           <div class="custom-no-selection" id="customNoSelection" hidden><div>▥</div><h3>Selecciona una variable para comenzar</h3><p>Las gráficas aparecerán aquí, una por indicador, en dos columnas.</p></div>
-          <p class="graph-disclaimer">Cada gráfica tiene su propia escala y unidad; los VOC y NOx son índices relativos, no concentraciones de gases. Se muestran hasta 350 puntos por gráfica, pero el CSV incluye todos los registros filtrados. Sin Supabase, solo hay datos de períodos en los que la página estuvo abierta en este navegador.</p>
+          <p class="graph-disclaimer">Cada gráfica tiene su propia escala y unidad; los VOC y NOx son índices relativos, no concentraciones de gases. Se muestran hasta 350 puntos por gráfica, pero el CSV incluye todos los registros filtrados. Historial centralizado desde Supabase cuando está configurado; MQTT sigue mostrando lecturas en directo. Para intervalos largos se presenta una muestra de las últimas 6.000 lecturas y el CSV descarga el período completo.</p>
           <article class="white-card readings-panel unified-readings">
             <div class="chart-head">
               <div><span class="section-eyebrow">REGISTRO DE MEDICIONES</span><h2>Últimas 12 mediciones</h2><p>Las 12 más recientes dentro del período seleccionado; los archivos CSV incluyen el historial completo o filtrado.</p></div>
               <div class="export-actions"><button class="export-btn export-outline" id="exportAllBtn" type="button" disabled>↓ CSV completo</button><button class="export-btn" id="exportBtn" type="button" disabled>↓ CSV del período</button></div>
             </div>
             <div class="table-scroll"><table class="readings-table"><thead><tr><th>Fecha y hora</th><th>PM1.0</th><th>PM2.5</th><th>PM4.0</th><th>PM10</th><th>Temperatura</th><th>Humedad</th><th>VOC Index</th><th>NOx Index</th></tr></thead><tbody id="recentRows"><tr><td colspan="9" class="empty-row">Sin mediciones para este período</td></tr></tbody></table></div>
-            <p class="table-footnote">Historial en IndexedDB de este navegador: se conservan las lecturas recibidas mientras esta web estuvo abierta. No se descargan mediciones de otros navegadores ni de momentos en que la web estuvo cerrada. Próximamente conectaremos Supabase.</p>
+            <p class="table-footnote">El historial se consulta de Supabase PostgreSQL. Las lecturas MQTT recientes también pueden aparecer en la tabla antes de su confirmación en la base de datos. Si falla Supabase, se informa cuando se muestran datos locales de respaldo.</p>
           </article>
         </section>
 
@@ -165,7 +165,7 @@
           <div class="page-intro intro-row"><div><div class="eyebrow">MONITOREO PREVENTIVO</div><h1 id="alertasTitulo">Centro de <span class="title-dot">alertas.</span></h1><p>Eventos confirmados por persistencia de cuatro mediciones consecutivas, aproximadamente dos minutos.</p></div><div class="alerts-live-label"><span class="pulse-dot"></span> Evaluación cada 30 segundos</div></div>
           <div class="alert-stats-row">
             <article class="alert-stat alert-stat-primary" id="alertStatusCard" data-level="pending"><span>Estado por partículas</span><strong id="alertsCurrentStatus">Sin evaluar</strong><small id="alertsCurrentDetail">Esperando cuatro lecturas consecutivas</small><div class="alert-stat-deco">◎</div></article>
-            <article class="alert-stat"><span>Eventos registrados</span><strong id="alertsTotal">0</strong><small>Guardados en este navegador</small></article>
+            <article class="alert-stat"><span>Eventos registrados</span><strong id="alertsTotal">0</strong><small>Eventos guardados en este navegador</small></article>
             <article class="alert-stat"><span>Avisos complementarios</span><strong id="alertsActive">0</strong><small>VOC y NOx · índices relativos</small></article>
           </div>
           <article class="white-card thresholds-panel">
@@ -181,19 +181,21 @@
           <article class="white-card secondary-alerts-panel"><div><span class="section-eyebrow">SENSORES DE GASES · ORIENTATIVOS</span><h2>Eventos relativos de VOC y NOx</h2><p>También registramos 4 lecturas consecutivas con VOC Index ≥150 o NOx Index ≥20. Estas cifras son criterios operativos, no umbrales sanitarios.</p></div><div class="secondary-rules"><div><strong>VOC</strong><span>≥ 150 durante 4 lecturas</span><small id="vocRuleState">Sin evaluación</small></div><div><strong>NOx</strong><span>≥ 20 durante 4 lecturas</span><small id="noxRuleState">Sin evaluación</small></div></div></article>
           <article class="white-card alerts-log-panel">
             <div class="alerts-log-heading"><div><span class="section-eyebrow">TRAZABILIDAD DE EVENTOS</span><h2>Historial de alertas</h2><p>Activaciones, cambios de nivel y recuperaciones con fecha y hora de captura.</p></div><div class="alert-table-actions"><label class="sr-only" for="alertFilter">Filtrar alertas</label><select id="alertFilter"><option value="todos">Todos los eventos</option><option value="pm">Solo partículas</option><option value="voc">Solo VOC</option><option value="nox">Solo NOx</option></select><button class="export-btn" id="exportAlertsBtn" type="button" disabled>↓ Exportar alertas</button></div></div>
-            <div class="table-scroll"><table class="alerts-table"><thead><tr><th>Fecha y hora</th><th>Indicador</th><th>Evento</th><th>Valor</th><th>Estado</th></tr></thead><tbody id="alertRows"><tr><td colspan="5" class="empty-row">Sin eventos confirmados todavía.</td></tr></tbody></table></div><p class="table-footnote">Los eventos quedan guardados localmente en este navegador. Sin Supabase todavía no existe un historial centralizado ni alertas cuando la página está cerrada.</p>
+            <div class="table-scroll"><table class="alerts-table"><thead><tr><th>Fecha y hora</th><th>Indicador</th><th>Evento</th><th>Valor</th><th>Estado</th></tr></thead><tbody id="alertRows"><tr><td colspan="5" class="empty-row">Sin eventos confirmados todavía.</td></tr></tbody></table></div><p class="table-footnote">Las alertas aún se calculan y guardan localmente en el navegador. La tabla central de alertas está pendiente de integración; con la web cerrada no se registran nuevos eventos de alerta.</p>
           </article>
           <article class="white-card ica-legend-panel"><div><span class="section-eyebrow">CONTEXTO NORMATIVO</span><h2>Índice de Calidad del Aire (ICA) colombiano</h2><p>La escala oficial tiene seis categorías y se determina con promedios de concentración de 24 horas para PM2.5 y PM10. Nuestra alerta inmediata <strong>no</strong> es ese índice.</p></div><div class="ica-legend-grid">
             <div><i style="--legend-color:#26a86a"></i><b>0–50</b><span>Buena</span></div><div><i style="--legend-color:#eac53d"></i><b>51–100</b><span>Aceptable</span></div><div><i style="--legend-color:#f2a34a"></i><b>101–150</b><span>Grupos sensibles</span></div><div><i style="--legend-color:#e65458"></i><b>151–200</b><span>Dañina</span></div><div><i style="--legend-color:#9562c7"></i><b>201–300</b><span>Muy dañina</span></div><div><i style="--legend-color:#85524c"></i><b>301–500</b><span>Peligrosa</span></div>
           </div><p class="ica-legal-note">Referencia: <a href="https://www.minambiente.gov.co/wp-content/uploads/2021/10/Resolucion-2254-de-2017.pdf" target="_blank" rel="noopener noreferrer">Resolución 2254 de 2017</a>. La aplicación no afirma cumplir la metodología oficial del ICA ni reemplaza estaciones de referencia.</p></article>
         </section>
 
-        <footer class="app-footer"><span>AIRE.BGA · Proyecto académico de Ingeniería de Software</span><span>Historial local en este navegador · Sin certificación regulatoria</span></footer>
+        <footer class="app-footer"><span>AIRE.BGA · Proyecto académico de Ingeniería de Software</span><span>Historial centralizado con Supabase · Sin certificación regulatoria</span></footer>
       </main>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mqtt@5.15.1/dist/mqtt.min.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-historial.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

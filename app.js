@@ -1,6 +1,6 @@
 /*
  AIRE.BGA · Estación 01 · Prototipo académico.
- MQTT público -> navegador -> IndexedDB (local).
+ MQTT -> vista en vivo y alertas locales. Supabase -> histórico centralizado de mediciones.
  Alertas operativas experimentales: cuatro mediciones consecutivas.
  NO se calcula ni se afirma disponer del ICA oficial colombiano.
 */
@@ -11,6 +11,10 @@ const COLUMNAS_CSV = ['fecha_hora','fecha_recepcion','pm1','pm25','pm4','pm10','
 const SEGUNDOS_INACTIVO = 95;
 const MAX_GRAFICA = 350;
 const CUATRO = 4;
+const MAX_REGISTROS_VISTA = 6000;
+const historialSupabase = window.AIRE_BGA_HISTORIAL;
+let lecturasMQTTRecientes = [];
+let errorHistorial = ''; 
 const NIVELES = [
   { nombre:'Normal', etiqueta:'Calidad por partículas: normal', clase:'normal', color:'#12a978' },
   { nombre:'Atención', etiqueta:'Atención por partículas', clase:'attention', color:'#e4b12b' },
@@ -250,6 +254,8 @@ async function procesarMensaje(p){
   else if(historialMem.some(x=>x.ts===ts))return false;
   if(dbDisponible){try{await guardar('mediciones',actual);}catch(e){console.warn(e);historialMem.push(actual);}}
   else historialMem.push(actual);
+  lecturasMQTTRecientes.push(actual);
+  lecturasMQTTRecientes = lecturasMQTTRecientes.filter(x => Date.now()-x.ts <= 180000).slice(-10);
   mostrarMedicion(actual,true);
   await evaluarAlertas(actual);
   actualizarEstado();
@@ -384,23 +390,54 @@ function dibujarTarjetaGrafica(clave,datos){
   }
 }
 let refrescoActivo=0;
+function filtrarRecientesMQTT(desde,hasta) {
+  return lecturasMQTTRecientes.filter(d => d.ts >= desde && d.ts <= hasta && Date.now()-d.ts <= 180000);
+}
+function fusionarMediciones(datos,recientes,maximo) {
+  const registros = new Map(datos.map(d => [d.ts,d]));
+  for (const d of recientes) registros.set(d.ts,d);
+  return [...registros.values()].sort((a,b)=>a.ts-b.ts).slice(-maximo);
+}
 async function actualizarGraficasPersonalizadas(){
   const req=++refrescoActivo;
   if(location.hash!=='#tendencias')return;
   const limites=filtrosGraficas();
   if(limites.error){$('graphFilterInfo').textContent=limites.error;return;}
-  let datos=await leerMediciones(limites.desde,limites.hasta);
+  const modo=$('graphRange').value;
+  const maximo=modo==='40'?40:MAX_REGISTROS_VISTA;
+  let datos=[],origen='',truncado=false;
+  if(historialSupabase?.disponible()) {
+    try {
+      const remoto=await historialSupabase.consultarVista({...limites,maximo});
+      datos=fusionarMediciones(remoto.datos,filtrarRecientesMQTT(limites.desde,limites.hasta),maximo);
+      truncado=remoto.truncado;
+      origen='Supabase PostgreSQL + MQTT reciente';
+      errorHistorial='';
+    }catch(error){
+      console.warn('Consulta Supabase:',error);
+      errorHistorial=error.message;
+      datos=await leerMediciones(limites.desde,limites.hasta);
+      origen='Solo datos locales de respaldo (Supabase no disponible)';
+    }
+  }else{
+    datos=await leerMediciones(limites.desde,limites.hasta);
+    origen='Solo historial local: falta configurar supabase-config.js';
+  }
   if(req!==refrescoActivo)return;
-  if($('graphRange').value==='40')datos=datos.slice(-40);
+  if(modo==='40')datos=datos.slice(-40);
+  if(datos.length>maximo)datos=datos.slice(-maximo);
   datosGraficas=datos;
   const n=datos.length;
-  $('graphFilterInfo').textContent=n?`${n.toLocaleString('es-CO')} lecturas disponibles · ${mostrarFecha(datos[0].ts)} a ${mostrarFecha(datos.at(-1).ts)}.`:'Aún no hay mediciones almacenadas para ese período.';
+  const fechaTexto=n?`${mostrarFecha(datos[0].ts)} a ${mostrarFecha(datos.at(-1).ts)}`:'Sin mediciones disponibles';
+  const mensajeMuestra=truncado && modo!=='40'?' · Muestra: últimas 6.000 lecturas; promedios calculados sobre esta muestra. CSV: período completo.':'';
+  const mensajeError=errorHistorial?` · ${errorHistorial}`:'';
+  $('graphFilterInfo').textContent=`${origen} · ${n.toLocaleString('es-CO')} lecturas visualizadas · ${fechaTexto}${mensajeMuestra}${mensajeError}`;
   $('exportBtn').disabled=n===0;
-  $('sessionCount').textContent=n.toLocaleString('es-CO');
+  $('exportAllBtn').disabled=!historialSupabase?.disponible() && n===0;
+  $('sessionCount').textContent=n.toLocaleString('es-CO')+(truncado && modo!=='40'?'+':'');
   const promedio=clave=>n?(datos.reduce((s,d)=>s+d[clave],0)/n).toFixed(1):'—';
   $('averagePm25').textContent=promedio('pm25');
   $('averagePm10').textContent=promedio('pm10');
-  // La tabla es una vista previa: exactamente las últimas 12 lecturas del período.
   const cuerpo=$('recentRows');cuerpo.replaceChildren();
   if(!n){
     const fila=document.createElement('tr');
@@ -424,7 +461,6 @@ async function actualizarGraficasPersonalizadas(){
     if(!seleccionGraficas.has(clave)){graf.destroy();graficasActivas.delete(clave);}
   }
   caja.querySelectorAll('[data-plot]').forEach(art=>{if(!seleccionGraficas.has(art.dataset.plot))art.remove();});
-  // El orden sigue el del checklist, no el orden en que se marcaron las casillas.
   for(const clave of Object.keys(META_GRAFICAS)){
     if(!seleccionGraficas.has(clave))continue;
     let card=caja.querySelector(`[data-plot="${clave}"]`);
@@ -434,6 +470,7 @@ async function actualizarGraficasPersonalizadas(){
   }
   actualizarSeleccionUI();
 }
+
 function programarRefrescoGraficas(){
   if(refrescoGraficas)clearTimeout(refrescoGraficas);
   refrescoGraficas=setTimeout(actualizarGraficasPersonalizadas,220);
@@ -462,8 +499,39 @@ setInterval(()=>{
   if(ultimoRecibido){const s=Math.floor((Date.now()-ultimoRecibido)/1000);$('freshness').textContent=esReciente()?`Hace ${s} s`:'Sin datos recientes';if(!esReciente()&&mqttCliente?.connected)setConexion('Sin datos recientes');}
   actualizarEstado();
 },5000);
-$('exportBtn').addEventListener('click',()=>descargarCSV('aire_bga_periodo.csv',COLUMNAS_CSV,alCSV(datosGraficas)));
-$('exportAllBtn').addEventListener('click',async()=>descargarCSV('aire_bga_todo_el_historial.csv',COLUMNAS_CSV,alCSV(await leerMediciones())));
+async function exportarMediciones(completo=false){
+  const boton=$(completo?'exportAllBtn':'exportBtn');
+  const nombre=completo?'aire_bga_todo_el_historial.csv':'aire_bga_periodo.csv';
+  let limites={desde:-Infinity,hasta:Infinity};
+  if(!completo){
+    limites=filtrosGraficas();
+    if(limites.error){$('graphFilterInfo').textContent=limites.error;return;}
+  }
+  if(historialSupabase?.disponible()){
+    boton.disabled=true;
+    const original=$('graphFilterInfo').textContent;
+    try {
+      const maximo=!completo && $('graphRange').value==='40'?40:Infinity;
+      const r=await historialSupabase.consultarCSV({...limites,maximo,progreso:n=>{
+        $('graphFilterInfo').textContent=`Preparando CSV desde Supabase: ${n.toLocaleString('es-CO')} mediciones leídas…`;
+      }});
+      if(!r.datos.length){$('graphFilterInfo').textContent='No hay registros centralizados para exportar.';return;}
+      descargarCSV(nombre,COLUMNAS_CSV,alCSV(r.datos));
+      $('graphFilterInfo').textContent=`CSV de Supabase preparado: ${r.datos.length.toLocaleString('es-CO')} mediciones. ${original}`;
+    }catch(error){
+      console.error('Exportación Supabase:',error);
+      $('graphFilterInfo').textContent=`No se pudo exportar desde Supabase: ${error.message}. No se ha generado un CSV local incompleto.`;
+    }finally{boton.disabled=false;}
+  }else{
+    const datos=completo?await leerMediciones():datosGraficas;
+    descargarCSV(nombre,COLUMNAS_CSV,alCSV(datos));
+    $('graphFilterInfo').textContent='CSV de respaldo local descargado. Configura Supabase para exportar el historial centralizado.';
+  }
+}
+$('exportBtn').addEventListener('click',()=>exportarMediciones(false));
+$('exportAllBtn').addEventListener('click',()=>exportarMediciones(true));
+// Refresca el historial remoto aunque la estación no envíe MQTT a este navegador.
+setInterval(()=>{if(location.hash==='#tendencias')actualizarGraficasPersonalizadas();},60000);
 $('alertFilter').addEventListener('change',actualizarTablaAlertas);
 $('exportAlertsBtn').addEventListener('click',async()=>{
   const eventos=(await leerEventos()).filter(e=>$('alertFilter').value==='todos'||e.tipo===$('alertFilter').value);
@@ -494,6 +562,6 @@ async function iniciar(){
   actualizarTablaAlertas();
   cambiarVista();
   conectarMQTT();
-  if(!dbDisponible)$('graphFilterInfo').textContent='Atención: almacenamiento local no disponible. El historial se perderá al cerrar esta pestaña.';
+  if(!dbDisponible && !historialSupabase?.disponible())$('graphFilterInfo').textContent='Atención: IndexedDB no disponible y Supabase sin configurar.';
 }
 iniciar().catch(e=>{console.error('Inicio:',e);setConexion('Error de inicio','offline');});
