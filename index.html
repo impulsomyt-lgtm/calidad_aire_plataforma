@@ -165,7 +165,7 @@
           <div class="page-intro intro-row"><div><div class="eyebrow">MONITOREO PREVENTIVO</div><h1 id="alertasTitulo">Centro de <span class="title-dot">alertas.</span></h1><p>Eventos confirmados por persistencia de cuatro mediciones consecutivas, aproximadamente dos minutos.</p></div><div class="alerts-live-label"><span class="pulse-dot"></span> Evaluación cada 30 segundos</div></div>
           <div class="alert-stats-row">
             <article class="alert-stat alert-stat-primary" id="alertStatusCard" data-level="pending"><span>Estado por partículas</span><strong id="alertsCurrentStatus">Sin evaluar</strong><small id="alertsCurrentDetail">Esperando cuatro lecturas consecutivas</small><div class="alert-stat-deco">◎</div></article>
-            <article class="alert-stat"><span>Eventos registrados</span><strong id="alertsTotal">0</strong><small>Eventos guardados en este navegador</small></article>
+            <article class="alert-stat"><span>Eventos registrados</span><strong id="alertsTotal">0</strong><small>Eventos centralizados en Supabase</small></article>
             <article class="alert-stat"><span>Avisos complementarios</span><strong id="alertsActive">0</strong><small>VOC y NOx · índices relativos</small></article>
           </div>
           <article class="white-card thresholds-panel">
@@ -181,7 +181,7 @@
           <article class="white-card secondary-alerts-panel"><div><span class="section-eyebrow">SENSORES DE GASES · ORIENTATIVOS</span><h2>Eventos relativos de VOC y NOx</h2><p>También registramos 4 lecturas consecutivas con VOC Index ≥150 o NOx Index ≥20. Estas cifras son criterios operativos, no umbrales sanitarios.</p></div><div class="secondary-rules"><div><strong>VOC</strong><span>≥ 150 durante 4 lecturas</span><small id="vocRuleState">Sin evaluación</small></div><div><strong>NOx</strong><span>≥ 20 durante 4 lecturas</span><small id="noxRuleState">Sin evaluación</small></div></div></article>
           <article class="white-card alerts-log-panel">
             <div class="alerts-log-heading"><div><span class="section-eyebrow">TRAZABILIDAD DE EVENTOS</span><h2>Historial de alertas</h2><p>Activaciones, cambios de nivel y recuperaciones con fecha y hora de captura.</p></div><div class="alert-table-actions"><label class="sr-only" for="alertFilter">Filtrar alertas</label><select id="alertFilter"><option value="todos">Todos los eventos</option><option value="pm">Solo partículas</option><option value="voc">Solo VOC</option><option value="nox">Solo NOx</option></select><button class="export-btn" id="exportAlertsBtn" type="button" disabled>↓ Exportar alertas</button></div></div>
-            <div class="table-scroll"><table class="alerts-table"><thead><tr><th>Fecha y hora</th><th>Indicador</th><th>Evento</th><th>Valor</th><th>Estado</th></tr></thead><tbody id="alertRows"><tr><td colspan="5" class="empty-row">Sin eventos confirmados todavía.</td></tr></tbody></table></div><p class="table-footnote">Las alertas aún se calculan y guardan localmente en el navegador. La tabla central de alertas está pendiente de integración; con la web cerrada no se registran nuevos eventos de alerta.</p>
+            <div class="table-scroll"><table class="alerts-table"><thead><tr><th>Fecha y hora</th><th>Indicador</th><th>Evento</th><th>Valor</th><th>Estado</th></tr></thead><tbody id="alertRows"><tr><td colspan="5" class="empty-row">Sin eventos confirmados todavía.</td></tr></tbody></table></div><p class="table-footnote" id="alertDataSource" role="status">Consultando el historial de alertas de Supabase…</p>
           </article>
           <article class="white-card ica-legend-panel"><div><span class="section-eyebrow">CONTEXTO NORMATIVO</span><h2>Índice de Calidad del Aire (ICA) colombiano</h2><p>La escala oficial tiene seis categorías y se determina con promedios de concentración de 24 horas para PM2.5 y PM10. Nuestra alerta inmediata <strong>no</strong> es ese índice.</p></div><div class="ica-legend-grid">
             <div><i style="--legend-color:#26a86a"></i><b>0–50</b><span>Buena</span></div><div><i style="--legend-color:#eac53d"></i><b>51–100</b><span>Aceptable</span></div><div><i style="--legend-color:#f2a34a"></i><b>101–150</b><span>Grupos sensibles</span></div><div><i style="--legend-color:#e65458"></i><b>151–200</b><span>Dañina</span></div><div><i style="--legend-color:#9562c7"></i><b>201–300</b><span>Muy dañina</span></div><div><i style="--legend-color:#85524c"></i><b>301–500</b><span>Peligrosa</span></div>
@@ -196,6 +196,7 @@
   <script src="https://cdn.jsdelivr.net/npm/mqtt@5.15.1/dist/mqtt.min.js"></script>
   <script src="supabase-config.js"></script>
   <script src="supabase-historial.js"></script>
+  <script src="supabase-alertas.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

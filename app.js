@@ -1,6 +1,6 @@
 /*
  AIRE.BGA · Estación 01 · Prototipo académico.
- MQTT -> vista en vivo y alertas locales. Supabase -> histórico centralizado de mediciones.
+ MQTT -> semáforo en vivo. Supabase -> historial centralizado de mediciones y eventos.
  Alertas operativas experimentales: cuatro mediciones consecutivas.
  NO se calcula ni se afirma disponer del ICA oficial colombiano.
 */
@@ -13,6 +13,7 @@ const MAX_GRAFICA = 350;
 const CUATRO = 4;
 const MAX_REGISTROS_VISTA = 6000;
 const historialSupabase = window.AIRE_BGA_HISTORIAL;
+const alertasSupabase = window.AIRE_BGA_ALERTAS;
 let lecturasMQTTRecientes = [];
 let errorHistorial = ''; 
 const NIVELES = [
@@ -33,15 +34,35 @@ let ultimasLecturas=[], ultimoRecibido=0, ultimaLectura=null, mensajesSesion=0;
 let estadoPM=null; // null: todavía no confirmado; entero 0 a 3
 let estadosGas={voc:false,nox:false};
 let eventosTotales=0, filtroActual='40', tareaRefresco=null;
-// El punto rojo informa de alertas NUEVAS pendientes de revisar, no del total histórico.
+// El punto rojo representa NUEVAS alertas desde la última revisión en este navegador.
+// El historial compartido vive en PostgreSQL. La marca de revisado es local a cada dispositivo.
 const CLAVE_ALERTAS_NO_LEIDAS = 'aire_bga_alertas_no_leidas_v1';
+const CLAVE_REVISION_REMOTA = 'aire_bga_alertas_revision_supabase_v1';
 let alertasNoLeidas = false;
-try { alertasNoLeidas = localStorage.getItem(CLAVE_ALERTAS_NO_LEIDAS) === '1'; }
-catch(e) { /* En modo privado sin almacenamiento, solo se recuerda durante la sesión. */ }
-
+let alertasRemotas = [], totalAlertasRemotas = 0;
+let alertasRemotasCargadas = false, errorAlertasRemotas = '', secuenciaConsultaAlertas = 0;
+let ultimaRevisionRemota = null;
+try {
+  if(alertasSupabase?.disponible()){
+    const s = localStorage.getItem(CLAVE_REVISION_REMOTA);
+    ultimaRevisionRemota = s !== null && Number.isFinite(Number(s)) ? Number(s) : null;
+  } else {
+    alertasNoLeidas = localStorage.getItem(CLAVE_ALERTAS_NO_LEIDAS) === '1';
+  }
+} catch(e) { /* El almacenamiento puede estar bloqueado. */ }
+function vistaAlertasActiva(){ return location.hash === '#alertas'; }
 function marcarAlertasRevisadas(){
   alertasNoLeidas = false;
-  try { localStorage.setItem(CLAVE_ALERTAS_NO_LEIDAS, '0'); } catch(e) {}
+  if(alertasSupabase?.disponible()){
+    if (alertasRemotasCargadas) {
+      // Tomar la marca temporal del servidor, no el reloj del celular o PC.
+      const ultimoVisto=alertasRemotas.reduce((max,e)=>Math.max(max,e.registroMs),0);
+      ultimaRevisionRemota=Math.max(ultimaRevisionRemota??0,ultimoVisto);
+      try {localStorage.setItem(CLAVE_REVISION_REMOTA, String(ultimaRevisionRemota));} catch(e){}
+    }
+  } else {
+    try { localStorage.setItem(CLAVE_ALERTAS_NO_LEIDAS, '0'); } catch(e) {}
+  }
   actualizarContadorAlertas();
 }
 function esNuevaAlerta(evento){
@@ -59,7 +80,7 @@ function cambiarVista(){
   $('breadcrumb').textContent=nombresVistas[vista]; window.scrollTo(0,0);
   if(vista==='tendencias') actualizarGraficasPersonalizadas();
   if(vista==='alertas'){
-    marcarAlertasRevisadas();
+    if(!alertasSupabase?.disponible() || alertasRemotasCargadas) marcarAlertasRevisadas();
     actualizarTablaAlertas();
   }
 }
@@ -111,6 +132,8 @@ async function leerEventos(){
   try{return await consultar('eventos');}catch(e){console.warn(e);return [];}
 }
 async function agregarEvento(tipo,nombre,evento,valor,nivel,ts,grado=null){
+  // Cuando Supabase está conectado, el trigger PostgreSQL es la fuente oficial.
+  if(alertasSupabase?.disponible()) return;
   const registro={tipo,nombre,evento,valor,nivel,ts,grado};
   if(dbDisponible){try{await guardar('eventos',registro);}catch(e){console.warn(e);eventosMem.push(registro);}}
   else eventosMem.push(registro);
@@ -214,20 +237,83 @@ function descargarCSV(nombre,columnas,datos){
 }
 function alCSV(datos){return datos.map(d=>({fecha_hora:d.fecha_hora||new Date(d.ts).toISOString(),fecha_recepcion:d.recibido,...Object.fromEntries(CAMPOS.map(c=>[c,d[c]]))}));}
 
-async function actualizarTablaAlertas(){
-  const eventos=await leerEventos();
-  eventosTotales=eventos.length;
+// ─── Alertas: un único historial centralizado, con respaldo local explícito ───
+function dibujarEventos(eventos, total=eventos.length, mensaje=''){
+  eventosTotales=total;
   actualizarContadorAlertas();
   const filtro=$('alertFilter').value;
   const visibles=eventos.filter(e=>filtro==='todos'||e.tipo===filtro);
-  $('exportAlertsBtn').disabled=!visibles.length;
-  $('alertRows').replaceChildren();
-  if(!visibles.length){const tr=document.createElement('tr');tr.innerHTML='<td colspan="5" class="empty-row">No hay eventos registrados con este filtro.</td>';$('alertRows').appendChild(tr);return;}
-  for(const e of visibles.slice(-80).reverse()){
-    const tr=document.createElement('tr');
-    [mostrarFecha(e.ts),e.nombre,e.evento,e.valor.toFixed(2)+(e.tipo==='pm'?' µg/m³':' (índice)')].forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td);});
-    const td=document.createElement('td');const badge=document.createElement('span');badge.className='level-chip '+(e.tipo==='pm'?NIVELES[e.grado||0].clase:(e.nivel==='Resuelto'?'normal':'attention'));badge.textContent=e.nivel;td.appendChild(badge);tr.appendChild(td);$('alertRows').appendChild(tr);
+  $('exportAlertsBtn').disabled = alertasSupabase?.disponible() ? total===0 || !!mensaje : !visibles.length;
+  const cuerpo=$('alertRows');
+  cuerpo.replaceChildren();
+  if(mensaje || !visibles.length){
+    const tr=document.createElement('tr'),td=document.createElement('td');
+    td.colSpan=5;td.className='empty-row';
+    td.textContent=mensaje || 'No hay eventos registrados con este filtro.';
+    tr.appendChild(td);cuerpo.appendChild(tr);
+    return;
   }
+  // Recibimos primero los más recientes desde PostgreSQL.
+  const ordenados=visibles.slice().sort((a,b)=>b.ts-a.ts);
+  for(const e of ordenados.slice(0,80)){
+    const tr=document.createElement('tr');
+    [mostrarFecha(e.ts),e.nombre,e.evento,e.valor.toFixed(2)+(e.tipo==='pm'?' µg/m³':' (índice)')].forEach(t=>{
+      const td=document.createElement('td');td.textContent=t;tr.appendChild(td);
+    });
+    const td=document.createElement('td'),badge=document.createElement('span');
+    const grado = NIVELES.findIndex(n=>n.nombre===e.nivel);
+    badge.className='level-chip '+(e.tipo==='pm' ? (NIVELES[Math.max(0,grado)].clase) : (e.nivel==='Resuelto'?'normal':'attention'));
+    badge.textContent=e.nivel;
+    td.appendChild(badge);tr.appendChild(td);cuerpo.appendChild(tr);
+  }
+}
+async function refrescarAlertasCentralizadas(){
+  if(!alertasSupabase?.disponible())return false;
+  const seq=++secuenciaConsultaAlertas;
+  try{
+    const r=await alertasSupabase.consultarRecientes({maximo:500});
+    if(seq!==secuenciaConsultaAlertas)return false;
+    alertasRemotas=r.datos;
+    totalAlertasRemotas=r.total;
+    alertasRemotasCargadas=true;
+    errorAlertasRemotas='';
+    if(ultimaRevisionRemota===null){
+      // Primera visita: no señalar alertas antiguas como si acabaran de llegar.
+      ultimaRevisionRemota=r.datos.reduce((max,e)=>Math.max(max,e.registroMs),0);
+      try {localStorage.setItem(CLAVE_REVISION_REMOTA,String(ultimaRevisionRemota));}catch(e){}
+    }
+    if(vistaAlertasActiva()) marcarAlertasRevisadas();
+    else alertasNoLeidas=r.datos.some(e=>esNuevaAlerta(e.evento) && e.registroMs>ultimaRevisionRemota);
+    eventosTotales=r.total;
+    actualizarContadorAlertas();
+    const nota=$('alertDataSource');
+    if(nota) nota.textContent=`Historial centralizado · Supabase PostgreSQL · ${r.total} evento(s) guardados. Se muestran los 80 más recientes del filtro dentro de los últimos 500 consultados. La marca de revisión es local a este navegador.`;
+    if(vistaAlertasActiva())dibujarEventos(alertasRemotas,totalAlertasRemotas);
+    return true;
+  }catch(e){
+    if(seq!==secuenciaConsultaAlertas)return false;
+    errorAlertasRemotas=e.message || String(e);
+    console.warn('Alertas Supabase:',e);
+    const nota=$('alertDataSource');
+    if(nota) nota.textContent=`No se pudo actualizar el historial de Supabase: ${errorAlertasRemotas}. Se mantiene la última consulta válida, si existe.`;
+    if(vistaAlertasActiva()){
+      if(alertasRemotasCargadas)dibujarEventos(alertasRemotas,totalAlertasRemotas);
+      else dibujarEventos([],0,'No se pudieron cargar las alertas de Supabase. Comprueba la conexión y los permisos de lectura.');
+    }
+    return false;
+  }
+}
+async function actualizarTablaAlertas(){
+  if(alertasSupabase?.disponible()){
+    if(alertasRemotasCargadas) dibujarEventos(alertasRemotas,totalAlertasRemotas);
+    else dibujarEventos([],0,'Consultando historial centralizado…');
+    await refrescarAlertasCentralizadas();
+    return;
+  }
+  const eventos=await leerEventos();
+  const nota=$('alertDataSource');
+  if(nota)nota.textContent='Respaldo local de este navegador. Configura supabase-config.js para consultar las alertas compartidas.';
+  dibujarEventos(eventos,eventos.length);
 }
 function mostrarMedicion(d,esNueva){
   ultimaLectura=d;
@@ -532,24 +618,57 @@ $('exportBtn').addEventListener('click',()=>exportarMediciones(false));
 $('exportAllBtn').addEventListener('click',()=>exportarMediciones(true));
 // Refresca el historial remoto aunque la estación no envíe MQTT a este navegador.
 setInterval(()=>{if(location.hash==='#tendencias')actualizarGraficasPersonalizadas();},60000);
-$('alertFilter').addEventListener('change',actualizarTablaAlertas);
+$('alertFilter').addEventListener('change',()=>{
+  if(alertasSupabase?.disponible() && alertasRemotasCargadas) dibujarEventos(alertasRemotas,totalAlertasRemotas);
+  else actualizarTablaAlertas();
+});
+// La verificación periódica funciona aun si MQTT no llega al navegador.
+setInterval(()=>{ if(alertasSupabase?.disponible())refrescarAlertasCentralizadas(); },30000);
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && alertasSupabase?.disponible())refrescarAlertasCentralizadas();
+});
 $('exportAlertsBtn').addEventListener('click',async()=>{
-  const eventos=(await leerEventos()).filter(e=>$('alertFilter').value==='todos'||e.tipo===$('alertFilter').value);
-  descargarCSV('aire_bga_alertas.csv',['fecha_hora','indicador','evento','valor','nivel'],eventos.map(e=>({fecha_hora:new Date(e.ts).toISOString(),indicador:e.nombre,evento:e.evento,valor:e.valor,nivel:e.nivel})));
+  const boton=$('exportAlertsBtn'), filtro=$('alertFilter').value;
+  if(alertasSupabase?.disponible()){
+    boton.disabled=true;
+    const nota=$('alertDataSource');
+    const texto=nota?.textContent || '';
+    try{
+      const eventos=await alertasSupabase.consultarCSV({tipo:filtro,progreso:n=>{
+        if(nota)nota.textContent=`Descargando historial de alertas: ${n.toLocaleString('es-CO')} filas…`;
+      }});
+      if(!eventos.length){if(nota)nota.textContent='No hay alertas que exportar con este filtro.';return;}
+      descargarCSV('aire_bga_alertas_supabase.csv',
+        ['fecha_evento_utc','fecha_colombia','fecha_registro_utc','indicador','evento','valor','nivel','tipo'],
+        eventos.map(e=>({fecha_evento_utc:new Date(e.ts).toISOString(),
+          fecha_colombia:mostrarFecha(e.ts),fecha_registro_utc:new Date(e.registroMs).toISOString(),
+          indicador:e.nombre,evento:e.evento,valor:e.valor,nivel:e.nivel,tipo:e.tipo})));
+      if(nota)nota.textContent=`CSV descargado: ${eventos.length} eventos. ${texto}`;
+    }catch(e){
+      console.error('CSV de alertas:',e);
+      if(nota)nota.textContent='No se pudo exportar el historial centralizado: '+e.message;
+    }finally{boton.disabled=false;}
+  }else{
+    const eventos=(await leerEventos()).filter(e=>filtro==='todos'||e.tipo===filtro);
+    descargarCSV('aire_bga_alertas_locales.csv',['fecha_hora','indicador','evento','valor','nivel'],
+      eventos.map(e=>({fecha_hora:new Date(e.ts).toISOString(),indicador:e.nombre,evento:e.evento,valor:e.valor,nivel:e.nivel})));
+  }
 });
 
 async function iniciar(){
   configurarGraficas();
   await abrirDB();
   const registros=await leerMediciones();
-  const eventos=await leerEventos();
+  const eventos=alertasSupabase?.disponible() ? [] : await leerEventos();
   eventosTotales=eventos.length;
-  actualizarContadorAlertas(); // Restaurar indicador de avisos nuevos sin revisar.
-  const pmEventos=eventos.filter(e=>e.tipo==='pm'&&Number.isInteger(e.grado));
-  if(pmEventos.length)estadoPM=pmEventos.at(-1).grado;
-  for(const tipo of ['voc','nox']){
-    const ev=eventos.filter(e=>e.tipo===tipo).at(-1);
-    if(ev)estadosGas[tipo]=ev.nivel!=='Resuelto';
+  actualizarContadorAlertas();
+  if(!alertasSupabase?.disponible()){
+    const pmEventos=eventos.filter(e=>e.tipo==='pm'&&Number.isInteger(e.grado));
+    if(pmEventos.length)estadoPM=pmEventos.at(-1).grado;
+    for(const tipo of ['voc','nox']){
+      const ev=eventos.filter(e=>e.tipo===tipo).at(-1);
+      if(ev)estadosGas[tipo]=ev.nivel!=='Resuelto';
+    }
   }
   if(registros.length){
     ultimasLecturas=registros.slice(-4);
@@ -559,9 +678,10 @@ async function iniciar(){
     $('exportAllBtn').disabled=false;
   }
   actualizarEstado();
-  actualizarTablaAlertas();
   cambiarVista();
   conectarMQTT();
+  if(alertasSupabase?.disponible())refrescarAlertasCentralizadas();
+  else actualizarTablaAlertas();
   if(!dbDisponible && !historialSupabase?.disponible())$('graphFilterInfo').textContent='Atención: IndexedDB no disponible y Supabase sin configurar.';
 }
 iniciar().catch(e=>{console.error('Inicio:',e);setConexion('Error de inicio','offline');});
