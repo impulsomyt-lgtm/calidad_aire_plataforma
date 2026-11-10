@@ -1,0 +1,80 @@
+
+@startuml
+
+title AIRE.BGA - Modelo Entidad-Relacion de PostgreSQL
+
+top to bottom direction
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontSize 13
+skinparam entityAttributeIconSize 0
+skinparam linetype polyline
+skinparam nodesep 55
+skinparam ranksep 65
+
+hide circle
+
+entity "ESTACIONES" as EST #EFF8F4 {
+  * id : uuid <<PK>>
+  --
+  * codigo : text <<UQ>>
+  * nombre : text
+  * ciudad : text
+  * entorno : text
+  * controlador : text
+  * sensor : text
+  * intervalo_segundos : integer
+  * activa : boolean
+  * creada_en : timestamptz
+}
+
+entity "MEDICIONES" as MED #F2F7FE {
+  * id : uuid <<PK>>
+  --
+  * estacion_id : uuid <<FK>>
+  * fecha_medicion : timestamptz
+  * fecha_recepcion : timestamptz
+  * pm1 : numeric(10,2)
+  * pm25 : numeric(10,2)
+  * pm4 : numeric(10,2)
+  * pm10 : numeric(10,2)
+  * temperatura : numeric(6,2)
+  * humedad : numeric(5,2)
+    voc_index : numeric(6,2) [opcional]
+    nox_index : numeric(6,2) [opcional]
+}
+
+entity "ALERTAS" as ALT #FFF9EE {
+  * id : uuid <<PK>>
+  --
+  * estacion_id : uuid <<FK>>
+    medicion_id : uuid <<FK, opcional>>
+  * fecha_evento : timestamptz
+  * fecha_registro : timestamptz
+  * tipo : text
+  * indicador : text
+  * evento : text
+  * nivel : text
+  * valor : numeric(12,2)
+}
+
+EST ||--o{ MED : "registra"
+EST ||--o{ ALT : "genera"
+MED |o--o{ ALT : "asociacion opcional"
+
+legend bottom
+|= Simbolo |= Significado |
+| PK | Clave primaria |
+| FK | Clave foranea |
+| UQ | Valor unico |
+| * | Campo obligatorio (NOT NULL) |
+| opcional | Permite NULL |
+
+Restricciones adicionales del esquema:
+- MEDICIONES: UNIQUE(estacion_id, fecha_medicion)
+- ALERTAS: UNIQUE(estacion_id, tipo, evento, fecha_evento)
+- ALERTAS.medicion_id: ON DELETE SET NULL
+endlegend
+
+@enduml

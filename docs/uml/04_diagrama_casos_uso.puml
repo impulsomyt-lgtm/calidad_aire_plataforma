@@ -1,0 +1,64 @@
+
+
+@startuml
+
+title AIRE.BGA - Diagrama UML de Casos de Uso
+
+left to right direction
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontSize 14
+skinparam linetype polyline
+skinparam nodesep 55
+skinparam ranksep 65
+
+skinparam usecase {
+    BackgroundColor #EFF8F5
+    BorderColor #278C75
+    FontColor #183B47
+}
+
+skinparam rectangle {
+    BackgroundColor #FFFFFF
+    BorderColor #587187
+}
+
+actor "Usuario de la\nplataforma" as U
+
+rectangle "Sistema AIRE.BGA" {
+
+    usecase "Consultar monitoreo\nambiental" as UC1
+
+    usecase "Analizar tendencias\nhistoricas" as UC2
+
+    usecase "Consultar y revisar\nalertas ambientales" as UC3
+
+    UC1 -[hidden]down- UC2
+    UC2 -[hidden]down- UC3
+}
+
+U -right-- UC1
+U -right-- UC2
+U -right-- UC3
+
+note right of UC1
+  - Consultar estado actual del aire
+  - Consultar las ocho variables
+    del sensor SEN55
+end note
+
+note right of UC2
+  - Visualizar graficas
+  - Seleccionar variables
+  - Filtrar mediciones por periodo
+  - Exportar mediciones en CSV
+end note
+
+note right of UC3
+  - Consultar historial de alertas
+  - Consultar reglas y niveles
+  - Exportar alertas en CSV
+end note
+
+@enduml

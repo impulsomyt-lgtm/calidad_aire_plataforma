@@ -1,0 +1,103 @@
+
+
+@startuml
+
+title AIRE.BGA - Diagrama UML de Secuencia
+
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+skinparam backgroundColor white
+
+autonumber
+
+participant "Sensirion\nSEN55" as SEN
+participant "ESP32" as ESP
+participant "Broker\nMQTT" as MQTT
+participant "Edge Function\nSupabase" as EDGE
+database "PostgreSQL" as DB
+participant "Data API\nREST" as API
+participant "Navegador\nAIRE.BGA" as WEB
+
+== Adquisicion de mediciones ==
+
+loop Ciclo programado cada 30 segundos
+
+    ESP -> SEN : Solicitar mediciones I2C
+    SEN --> ESP : PM, temperatura, humedad,\nVOC Index y NOx Index
+
+    ESP -> ESP : Preparar JSON con fecha y hora
+
+    group Publicacion MQTT
+
+        ESP -> MQTT : Publicar medicion JSON
+        ESP -> ESP : Verificar resultado de mqtt.publish()
+
+    end
+
+    group Almacenamiento HTTPS
+
+        ESP -> EDGE : POST registrar-medicion
+        EDGE -> EDGE : Validar token y datos
+
+        alt Solicitud autorizada y valida
+
+            EDGE -> DB : Identificar estacion e\ninsertar medicion
+
+            DB -> DB : Ejecutar trigger SQL
+
+            opt Cuatro lecturas confirman un cambio
+
+                DB -> DB : Registrar activacion,\ncambio o normalizacion
+
+            end
+
+            DB --> EDGE : Operacion completada
+            EDGE --> ESP : HTTP 200
+
+        else Solicitud no autorizada
+
+            EDGE --> ESP : HTTP 401
+
+        end
+
+    end
+
+    opt Navegador conectado a MQTT
+
+        MQTT --> WEB : Entregar medicion por WSS
+        WEB -> WEB : Actualizar panel y sensores
+
+    end
+
+end
+
+note over MQTT,WEB
+La entrega MQTT es asincrona.
+No depende del almacenamiento en Supabase.
+end note
+
+== Consulta de datos historicos ==
+
+WEB -> API : HTTPS GET /mediciones
+
+API -> DB : Consultar mediciones con RLS
+DB --> API : Resultados autorizados
+API --> WEB : JSON de mediciones
+
+WEB -> WEB : Actualizar graficas y tabla
+
+== Consulta de alertas ==
+
+WEB -> API : HTTPS GET /alertas
+
+API -> DB : Consultar eventos con RLS
+DB --> API : Eventos autorizados
+API --> WEB : JSON de alertas
+
+WEB -> WEB : Mostrar historial de eventos
+
+@enduml

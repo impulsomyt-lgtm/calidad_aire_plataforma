@@ -1,0 +1,47 @@
+
+@startuml
+title AIRE.BGA - Diagrama UML de Componentes
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+left to right direction
+
+package "Estacion IoT" {
+  [Sensirion SEN55] as SEN
+  [Firmware ESP32] as ESP
+}
+
+cloud "Broker MQTT" {
+  [Servicio MQTT] as MQTT
+}
+
+cloud "Supabase" {
+  [Edge Function\nregistrar-medicion] as EDGE
+  database "PostgreSQL" {
+    [Mediciones] as MED
+    [Estaciones] as EST
+    [Trigger de alertas] as TRIG
+    [Alertas] as ALT
+  }
+}
+
+cloud "Vercel" {
+  [Plataforma AIRE.BGA\nHTML, CSS, JavaScript] as WEB
+}
+
+actor "Usuario" as USER
+
+SEN --> ESP : I2C
+ESP --> MQTT : Publica JSON cada 30 s
+ESP --> EDGE : HTTPS POST
+EDGE --> MED : Inserta mediciones
+EDGE --> EST : Identifica estacion
+MED --> TRIG : Nueva medicion
+TRIG --> ALT : Registra eventos
+
+MQTT --> WEB : WebSocket / tiempo real
+MED --> WEB : API REST / historico
+ALT --> WEB : API REST / alertas
+USER --> WEB : Consulta y exporta CSV
+
+@enduml

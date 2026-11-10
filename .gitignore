@@ -17,3 +17,12 @@ Thumbs.db
 
 # Exportaciones locales de datos
 *.csv
+
+# Configuracion privada del ESP32
+**/config_local.h
+
+# Evidencias fotograficas y datos locales
+docs/evidencias/
+
+# Archivos generados automaticamente
+out/

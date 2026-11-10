@@ -1,0 +1,125 @@
+
+
+
+@startuml
+
+title AIRE.BGA - Diagrama UML de Despliegue
+
+left to right direction
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultFontSize 13
+skinparam nodesep 60
+skinparam ranksep 65
+skinparam backgroundColor white
+
+skinparam node {
+    BackgroundColor #F4F8FC
+    BorderColor #52677C
+}
+
+skinparam cloud {
+    BackgroundColor #F3FAF7
+    BorderColor #438B79
+}
+
+skinparam database {
+    BackgroundColor #FFF9ED
+    BorderColor #B99A59
+}
+
+' ============================================
+' ESTACION IOT
+' ============================================
+
+node "Estacion IoT - Bucaramanga" as ESTACION {
+
+    node "Sensirion SEN55" as SEN
+
+    node "ESP32" as ESP {
+        artifact "Firmware Arduino C++" as FW
+    }
+
+    SEN -down-> ESP : I2C
+}
+
+' ============================================
+' BROKER MQTT
+' ============================================
+
+cloud "Broker MQTT\nHiveMQ" as MQTT
+
+' ============================================
+' SUPABASE
+' ============================================
+
+cloud "Supabase Cloud" as SUP {
+
+    node "Edge Function\nregistrar-medicion" as EDGE
+
+    node "Data API REST\nConsultas con RLS" as API
+
+    database "PostgreSQL" as DB {
+
+        artifact "estaciones" as EST
+        artifact "mediciones" as MED
+        artifact "alertas" as ALT
+
+        component "Trigger SQL\nEvaluacion de alertas" as TRG
+
+    }
+
+    EDGE -down-> DB
+    API -down-> DB
+
+}
+
+' ============================================
+' VERCEL
+' ============================================
+
+cloud "Vercel" as VERCEL {
+
+    artifact "Plataforma AIRE.BGA\nHTML / CSS / JavaScript" as WEB
+
+}
+
+' ============================================
+' DISPOSITIVO DEL USUARIO
+' ============================================
+
+node "Dispositivo del usuario" as CLIENTE {
+
+    artifact "Navegador web" as NAV
+
+}
+
+' ============================================
+' COMUNICACIONES
+' ============================================
+
+ESTACION -down-> MQTT : 1
+
+ESTACION -down-> SUP : 2
+
+MQTT -down-> CLIENTE : 3
+
+NAV -left-> API : 4
+
+WEB -down-> NAV : 5
+
+' ============================================
+' LEYENDA DE PROTOCOLOS
+' ============================================
+
+legend bottom
+|= N. |= Comunicacion |= Protocolo |
+| 1 | ESP32 a broker MQTT | MQTT / JSON |
+| 2 | ESP32 a Edge Function | HTTPS POST |
+| 3 | Broker a navegador | WebSocket WSS |
+| 4 | Navegador consulta Data API | HTTPS / REST |
+| 5 | Vercel entrega aplicacion web | HTTPS |
+endlegend
+
+@enduml

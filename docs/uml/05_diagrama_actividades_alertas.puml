@@ -1,0 +1,110 @@
+
+@startuml
+
+title AIRE.BGA - Deteccion y gestion automatica de alertas
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontSize 13
+
+skinparam activity {
+    BackgroundColor #F2F8FC
+    BorderColor #52778B
+    DiamondBackgroundColor #EAF7F0
+    DiamondBorderColor #278C75
+    ArrowColor #52778B
+}
+
+start
+
+:ESP32 envia medicion ambiental\nmediante HTTPS;
+
+:Edge Function valida\nel token y los datos;
+
+if (Solicitud valida?) then (Si)
+
+    :Guardar medicion\nen PostgreSQL;
+
+    :Ejecutar trigger SQL\nAFTER INSERT;
+
+    partition "Evaluacion de material particulado" {
+
+        :Clasificar PM2.5 y PM10\nsegun umbrales experimentales;
+
+        :Evaluar cuatro lecturas\nconsecutivas;
+
+        if (Se confirma un cambio de nivel?) then (Si)
+
+            if (Nuevo nivel normal?) then (Si)
+
+                :Registrar normalizacion;
+
+            else (No)
+
+                if (Aumenta el nivel?) then (Si)
+
+                    :Registrar activacion\no aumento de alerta;
+
+                else (No)
+
+                    :Registrar reduccion\nde alerta;
+
+                endif
+
+            endif
+
+        else (No)
+
+            :Conservar estado confirmado\nsin registrar evento;
+
+        endif
+
+    }
+
+    partition "Evaluacion complementaria VOC y NOx" {
+
+        :Evaluar indices relativos\nVOC y NOx por separado;
+
+        :Aplicar criterios experimentales\nVOC >= 150 o NOx >= 20;
+
+        :Evaluar cuatro lecturas consecutivas\npara cada indicador;
+
+        if (Se confirma un cambio\nen algun indicador?) then (Si)
+
+            if (El indicador supera su umbral?) then (Si)
+
+                :Registrar incremento\nrelativo detectado;
+
+            else (No)
+
+                :Registrar retorno a\nreferencia operativa;
+
+            endif
+
+        else (No)
+
+            :No registrar un evento nuevo;
+
+        endif
+
+    }
+
+    :Conservar los eventos generados\nen la tabla alertas;
+
+else (No)
+
+    :Rechazar solicitud\nsin guardar mediciones;
+
+endif
+
+stop
+
+legend bottom
+Las alertas se confirman mediante cuatro lecturas consecutivas.
+Las recuperaciones tambien requieren cuatro lecturas.
+VOC y NOx se evaluan independientemente.
+Son indices relativos, no concentraciones de gas.
+Los umbrales son experimentales y no equivalen al ICA oficial.
+endlegend
+
+@enduml
